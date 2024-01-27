@@ -12,6 +12,10 @@ if status is-interactive
 
 end
 
+alias vim "nvim"
+
+[ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
+
 starship init fish | source
 if test -f ~/.config/fish/sequences.txt
     cat ~/.config/fish/sequences.txt
