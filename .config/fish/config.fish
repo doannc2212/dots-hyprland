@@ -6,15 +6,30 @@ function fish_prompt -d "Write out the prompt"
         (set_color $fish_color_cwd) (prompt_pwd) (set_color normal)
 end
 
+# foot
+function update_cwd_osc --on-variable PWD --description 'Notify terminals when $PWD changes'
+    if status --is-command-substitution || set -q INSIDE_EMACS
+        return
+    end
+    printf \e\]7\;file://%s%s\e\\ $hostname (string escape --style=url $PWD)
+end
+function mark_prompt_start --on-event fish_prompt
+    echo -en "\e]133;A\e\\"
+end
+
+update_cwd_osc # Run once since we might have inherited PWD from a parent shell
+
 if status is-interactive
     # Commands to run in interactive sessions can go here
     set fish_greeting
 
 end
 
-alias vim "nvim"
+set -g fish_key_bindings fish_hybrid_key_bindings
 
-[ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
+alias vim nvim
+
+[ "$TERM" = xterm-kitty ] && alias ssh="kitty +kitten ssh"
 
 starship init fish | source
 
