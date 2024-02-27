@@ -42,3 +42,7 @@ alias pamcan=pacman
 #   set_color cyan; echo (pwd)
 #   set_color green; echo '> '
 # end
+
+# bun
+set --export BUN_INSTALL "$HOME/.bun"
+set --export PATH $BUN_INSTALL/bin $PATH
