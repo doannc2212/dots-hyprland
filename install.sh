@@ -128,36 +128,61 @@ else ask_bibata=true
 fi
 if $ask_bibata;then showfun install-bibata;v install-bibata;fi
 
-if $(test -d /usr/local/bin/LaTex); then
-  echo -e "\e[33m[$0]: Program \"MicroTex\" already exists, no need to install.\e[0m"
+if command -v LaTeX >/dev/null 2>&1;then
+  echo -e "\e[33m[$0]: Program \"MicroTeX\" already exists, no need to install.\e[0m"
   echo -e "\e[34mYou can reinstall it in order to update to the latest version anyway.\e[0m"
-  ask_MicroTex=$ask
-else ask_MicroTex=true
+  ask_MicroTeX=$ask
+else ask_MicroTeX=true
 fi
-if $ask_MicroTex;then showfun install-MicroTex;v install-MicroTex;fi
+if $ask_MicroTeX;then showfun install-MicroTeX;v install-MicroTeX;fi
 
 #####################################################################################
 printf "\e[36m[$0]: 3. Copying\e[97m\n"
 
-# In case ~/.local/bin does not exists
-v mkdir -p "$HOME/.local/bin" "$HOME/.local/share"
+# In case some folders does not exists
+v mkdir -p "$HOME"/.{config,cache,local/{bin,share}}
 
 # `--delete' for rsync to make sure that
 # original dotfiles and new ones in the SAME DIRECTORY
 # (eg. in ~/.config/hypr) won't be mixed together
 
-for i in .config/*
-do
+# For .config/* but not AGS, not Hyprland
+for file in $(find .config/ -mindepth 1 -maxdepth 1 ! -name 'ags' ! -name 'hypr' -exec basename {} \;); do
   echo "[$0]: Found target: $i"
   if [ -d "$i" ];then v rsync -av --delete "$i/" "$HOME/$i/"
   elif [ -f "$i" ];then v rsync -av "$i" "$HOME/$i"
   fi
 done
 
-# target="$HOME/.config/hypr/colors.conf"
-# test -f $target || { \
-#   echo -e "\e[34m[$0]: File \"$target\" not found.\e[0m" && \
-#   v cp "$HOME/.config/hypr/colors_default.conf" $target ; }
+# For AGS
+v rsync -av --delete --exclude '/user_options.js' .config/ags/ "$HOME"/.config/ags/
+t="$HOME/.config/ags/user_options.js"
+if [ -f $t ];then
+  echo -e "\e[34m[$0]: \"$t\" already exists.\e[0m"
+  v cp -f .config/ags/user_options.js $t.new
+else
+  echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
+  v cp .config/ags/user_options.js $t
+fi
+
+# For Hyprland
+v rsync -av --delete --exclude '/custom' --exclude '/hyprland.conf' .config/hypr/ "$HOME"/.config/hypr/
+t="$HOME/.config/hypr/hyprland.conf"
+if [ -f $t ];then
+  echo -e "\e[34m[$0]: \"$t\" already exists.\e[0m"
+  v cp -f .config/hypr/hyprland.conf $t.new
+else
+  echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
+  v cp .config/hypr/hyprland.conf $t
+fi
+t="$HOME/.config/hypr/custom"
+if [ -d $t ];then
+  echo -e "\e[34m[$0]: \"$t\" already exists, will not do anything.\e[0m"
+else
+  echo -e "\e[33m[$0]: \"$t\" does not exist yet.\e[0m"
+  v rsync -av --delete .config/hypr/custom/ $t/
+fi
+
 
 # some foldes (eg. .local/bin) should be processed seperately to avoid `--delete' for rsync,
 # since the files here come from different places, not only about one program.

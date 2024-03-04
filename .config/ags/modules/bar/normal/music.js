@@ -1,11 +1,20 @@
+const { GLib } = imports.gi;
 import Widget from 'resource:///com/github/Aylur/ags/widget.js';
 import * as Utils from 'resource:///com/github/Aylur/ags/utils.js';
 import Mpris from 'resource:///com/github/Aylur/ags/service/mpris.js';
-const { Box, Label, Overlay, Revealer } = Widget;
+const { Box, Button, EventBox, Label, Overlay, Revealer, Scrollable } = Widget;
 const { execAsync, exec } = Utils;
-import { AnimatedCircProg } from "../.commonwidgets/cairo_circularprogress.js";
-import { MaterialIcon } from '../.commonwidgets/materialicon.js';
-import { showMusicControls } from '../../variables.js';
+import { AnimatedCircProg } from "../../.commonwidgets/cairo_circularprogress.js";
+import { MaterialIcon } from '../../.commonwidgets/materialicon.js';
+import { showMusicControls } from '../../../variables.js';
+
+const CUSTOM_MODULE_CONTENT_INTERVAL_FILE = `${GLib.get_home_dir()}/.cache/ags/user/scripts/custom-module-interval.txt`;
+const CUSTOM_MODULE_CONTENT_SCRIPT = `${GLib.get_home_dir()}/.cache/ags/user/scripts/custom-module-poll.sh`;
+const CUSTOM_MODULE_LEFTCLICK_SCRIPT = `${GLib.get_home_dir()}/.cache/ags/user/scripts/custom-module-leftclick.sh`;
+const CUSTOM_MODULE_RIGHTCLICK_SCRIPT = `${GLib.get_home_dir()}/.cache/ags/user/scripts/custom-module-rightclick.sh`;
+const CUSTOM_MODULE_MIDDLECLICK_SCRIPT = `${GLib.get_home_dir()}/.cache/ags/user/scripts/custom-module-middleclick.sh`;
+const CUSTOM_MODULE_SCROLLUP_SCRIPT = `${GLib.get_home_dir()}/.cache/ags/user/scripts/custom-module-scrollup.sh`;
+const CUSTOM_MODULE_SCROLLDOWN_SCRIPT = `${GLib.get_home_dir()}/.cache/ags/user/scripts/custom-module-scrolldown.sh`;
 
 function trimTrackTitle(title) {
     if (!title) return '';
@@ -17,10 +26,10 @@ function trimTrackTitle(title) {
     return title;
 }
 
-const BarGroup = ({ child }) => Widget.Box({
+const BarGroup = ({ child }) => Box({
     className: 'bar-group-margin bar-sides',
     children: [
-        Widget.Box({
+        Box({
             className: 'bar-group bar-group-standalone bar-group-pad-system',
             children: [child],
         }),
@@ -33,16 +42,19 @@ const BarResource = (name, icon, command) => {
         vpack: 'center',
         hpack: 'center',
     });
-    const resourceProgress = Overlay({
-        child: Widget.Box({
-            vpack: 'center',
-            className: 'bar-batt',
-            homogeneous: true,
-            children: [
-                MaterialIcon(icon, 'small'),
-            ],
-        }),
-        overlays: [resourceCircProg]
+    const resourceProgress = Box({
+        homogeneous: true,
+        children: [Overlay({
+            child: Box({
+                vpack: 'center',
+                className: 'bar-batt',
+                homogeneous: true,
+                children: [
+                    MaterialIcon(icon, 'small'),
+                ],
+            }),
+            overlays: [resourceCircProg]
+        })]
     });
     const resourceLabel = Label({
         className: 'txt-smallie txt-onSurfaceVariant',
@@ -50,8 +62,8 @@ const BarResource = (name, icon, command) => {
     const widget = Box({
         className: 'spacing-h-4 txt-onSurfaceVariant',
         children: [
-            resourceLabel,
             resourceProgress,
+            resourceLabel,
         ],
         setup: (self) => self
             .poll(5000, () => execAsync(['bash', '-c', command])
@@ -93,14 +105,14 @@ const switchToRelativeWorkspace = async (self, num) => {
 
 export default () => {
     // TODO: use cairo to make button bounce smaller on click, if that's possible
-    const playingState = Widget.Box({ // Wrap a box cuz overlay can't have margins itself
+    const playingState = Box({ // Wrap a box cuz overlay can't have margins itself
         homogeneous: true,
-        children: [Widget.Overlay({
-            child: Widget.Box({
+        children: [Overlay({
+            child: Box({
                 vpack: 'center',
                 className: 'bar-music-playstate',
                 homogeneous: true,
-                children: [Widget.Label({
+                children: [Label({
                     vpack: 'center',
                     className: 'bar-music-playstate-txt',
                     justification: 'center',
@@ -121,9 +133,9 @@ export default () => {
             ]
         })]
     });
-    const trackTitle = Widget.Scrollable({
+    const trackTitle = Scrollable({
         hexpand: true,
-        child: Widget.Label({
+        child: Label({
             className: 'txt-smallie txt-onSurfaceVariant',
             setup: (self) => self.hook(Mpris, label => {
                 const mpris = Mpris.getPlayer('');
@@ -142,40 +154,67 @@ export default () => {
             trackTitle,
         ]
     })
-    const systemResources = BarGroup({
-        child: Box({
-            children: [
-                BarResource('RAM Usage', 'memory', `LANG=C free | awk '/^Mem/ {printf("%.2f\\n", ($3/$2) * 100)}'`),
-                Revealer({
-                    revealChild: true,
-                    transition: 'slide_left',
-                    transitionDuration: 200,
-                    child: Box({
-                        className: 'spacing-h-10 margin-left-10',
-                        children: [
-                            BarResource('Swap Usage', 'swap_horiz', `LANG=C free | awk '/^Swap/ {if ($2 > 0) printf("%.2f\\n", ($3/$2) * 100); else print "0";}'`),
-                            BarResource('CPU Usage', 'settings_motion_mode', `LANG=C top -bn1 | grep Cpu | sed 's/\\,/\\./g' | awk '{print $2}'`),
-                        ]
+    const SystemResourcesOrCustomModule = () => {
+        // Check if ~/.cache/ags/user/scripts/custom-module-poll.sh exists
+        if (GLib.file_test(CUSTOM_MODULE_CONTENT_SCRIPT, GLib.FileTest.EXISTS)) {
+            const interval = Number(Utils.readFile(CUSTOM_MODULE_CONTENT_INTERVAL_FILE)) || 5000;
+            return BarGroup({
+                child: Button({
+                    child: Label({
+                        className: 'txt-smallie txt-onSurfaceVariant',
+                        useMarkup: true,
+                        setup: (self) => Utils.timeout(1, () => {
+                            self.label = exec(CUSTOM_MODULE_CONTENT_SCRIPT);
+                            self.poll(interval, (self) => {
+                                const content = exec(CUSTOM_MODULE_CONTENT_SCRIPT);
+                                self.label = content;
+                            })
+                        })
                     }),
-                    setup: (self) => self.hook(Mpris, label => {
-                        const mpris = Mpris.getPlayer('');
-                        self.revealChild = (!mpris);
-                    }),
+                    onPrimaryClickRelease: () => execAsync(CUSTOM_MODULE_LEFTCLICK_SCRIPT).catch(print),
+                    onSecondaryClickRelease: () => execAsync(CUSTOM_MODULE_RIGHTCLICK_SCRIPT).catch(print),
+                    onMiddleClickRelease: () => execAsync(CUSTOM_MODULE_MIDDLECLICK_SCRIPT).catch(print),
+                    onScrollUp: () => execAsync(CUSTOM_MODULE_SCROLLUP_SCRIPT).catch(print),
+                    onScrollDown: () => execAsync(CUSTOM_MODULE_SCROLLDOWN_SCRIPT).catch(print),
                 })
-            ],
-        })
-    });
-    return Widget.EventBox({
+            });
+        } else {
+            return BarGroup({
+                child: Box({
+                    children: [
+                        BarResource('RAM Usage', 'memory', `LANG=C free | awk '/^Mem/ {printf("%.2f\\n", ($3/$2) * 100)}'`),
+                        Revealer({
+                            revealChild: true,
+                            transition: 'slide_left',
+                            transitionDuration: userOptions.animations.durationLarge,
+                            child: Box({
+                                className: 'spacing-h-10 margin-left-10',
+                                children: [
+                                    BarResource('Swap Usage', 'swap_horiz', `LANG=C free | awk '/^Swap/ {if ($2 > 0) printf("%.2f\\n", ($3/$2) * 100); else print "0";}'`),
+                                    BarResource('CPU Usage', 'settings_motion_mode', `LANG=C top -bn1 | grep Cpu | sed 's/\\,/\\./g' | awk '{print $2}'`),
+                                ]
+                            }),
+                            setup: (self) => self.hook(Mpris, label => {
+                                const mpris = Mpris.getPlayer('');
+                                self.revealChild = (!mpris);
+                            }),
+                        })
+                    ],
+                })
+            });
+        }
+    }
+    return EventBox({
         onScrollUp: (self) => switchToRelativeWorkspace(self, -1),
         onScrollDown: (self) => switchToRelativeWorkspace(self, +1),
         onPrimaryClickRelease: () => showMusicControls.setValue(!showMusicControls.value),
         onSecondaryClickRelease: () => execAsync(['bash', '-c', 'playerctl next || playerctl position `bc <<< "100 * $(playerctl metadata mpris:length) / 1000000 / 100"` &']).catch(print),
         onMiddleClickRelease: () => execAsync('playerctl play-pause').catch(print),
         child: Box({
-            className: 'spacing-h-5',
+            className: 'spacing-h-4',
             children: [
+                SystemResourcesOrCustomModule(),
                 BarGroup({ child: musicStuff }),
-                systemResources,
             ]
         })
     });

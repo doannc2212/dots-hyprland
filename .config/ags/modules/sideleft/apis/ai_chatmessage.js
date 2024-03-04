@@ -12,7 +12,7 @@ const LATEX_DIR = `${GLib.get_user_cache_dir()}/ags/media/latex`;
 const CUSTOM_SOURCEVIEW_SCHEME_PATH = `${App.configDir}/assets/themes/sourceviewtheme.xml`;
 const CUSTOM_SCHEME_ID = 'custom';
 const USERNAME = GLib.get_user_name();
-const CHATGPT_CURSOR = '  ...';
+Gtk.IconTheme.get_default().append_search_path(LATEX_DIR);
 
 /////////////////////// Custom source view colorscheme /////////////////////////
 
@@ -33,13 +33,6 @@ function loadCustomColorScheme(filePath) {
 loadCustomColorScheme(CUSTOM_SOURCEVIEW_SCHEME_PATH);
 
 //////////////////////////////////////////////////////////////////////////////
-
-function copyToClipboard(text) {
-    const clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD);
-    const textVariant = new GLib.Variant('s', text);
-    clipboard.set_text(textVariant, -1);
-    clipboard.store();
-}
 
 function substituteLang(str) {
     const subs = [
@@ -84,7 +77,7 @@ const TextBlock = (content = '') => Label({
 
 Utils.execAsync(['bash', '-c', `rm ${LATEX_DIR}/*`])
     .then(() => Utils.execAsync(['bash', '-c', `mkdir -p ${LATEX_DIR}`]))
-    .catch(print);
+    .catch(() => {});
 const Latex = (content = '') => {
     const latexViewArea = Box({
         // vscroll: 'never',
@@ -116,7 +109,6 @@ LaTeX -headless -input="$text" -output=${outFilePath} -textsize=${fontSize * 1.1
                 Utils.exec(`chmod a+x ${scriptFilePath}`)
                 Utils.timeout(100, () => {
                     Utils.exec(`bash ${scriptFilePath}`);
-                    Gtk.IconTheme.get_default().append_search_path(LATEX_DIR);
                     self.child?.destroy();
                     self.child = Gtk.Image.new_from_file(outFilePath);
                 })
@@ -265,7 +257,7 @@ const MessageContent = (content) => {
                     const lastLabel = kids[kids.length - 1];
                     let blockContent = lines.slice(lastProcessed, lines.length).join('\n');
                     if (!inCode)
-                        lastLabel.label = `${md2pango(blockContent)}${useCursor ? CHATGPT_CURSOR : ''}`;
+                        lastLabel.label = `${md2pango(blockContent)}${useCursor ? userOptions.ai.writingCursor : ''}`;
                     else
                         lastLabel.attribute.updateText(blockContent);
                 }
