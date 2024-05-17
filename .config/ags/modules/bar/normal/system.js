@@ -30,24 +30,24 @@ const BatBatteryProgress = () => {
 
 const BarClock = () => Widget.Box({
     vpack: 'center',
-    className: 'spacing-h-4 txt-onSurfaceVariant bar-clock-box',
+    className: 'spacing-h-4 bar-clock-box',
     children: [
         Widget.Label({
-            className: 'bar-clock',
-            label: GLib.DateTime.new_now_local().format("%H:%M"),
-            setup: (self) => self.poll(5000, label => {
-                label.label = GLib.DateTime.new_now_local().format("%H:%M");
+            className: 'bar-time',
+            label: GLib.DateTime.new_now_local().format(userOptions.time.format),
+            setup: (self) => self.poll(userOptions.time.interval, label => {
+                label.label = GLib.DateTime.new_now_local().format(userOptions.time.format);
             }),
         }),
         Widget.Label({
-            className: 'txt-norm',
+            className: 'txt-norm txt-onLayer1',
             label: '•',
         }),
         Widget.Label({
-            className: 'txt-smallie',
-            label: GLib.DateTime.new_now_local().format("%A, %d/%m"),
-            setup: (self) => self.poll(5000, label => {
-                label.label = GLib.DateTime.new_now_local().format("%A, %d/%m");
+            className: 'txt-smallie bar-date',
+            label: GLib.DateTime.new_now_local().format(userOptions.time.dateFormatLong),
+            setup: (self) => self.poll(userOptions.time.dateInterval, (label) => {
+                label.label = GLib.DateTime.new_now_local().format(userOptions.time.dateFormatLong);
             }),
         }),
     ],
@@ -63,11 +63,11 @@ const UtilButton = ({ name, icon, onClicked }) => Button({
 
 const Utilities = () => Box({
     hpack: 'center',
-    className: 'spacing-h-4 txt-onSurfaceVariant',
+    className: 'spacing-h-4',
     children: [
         UtilButton({
             name: 'Screen snip', icon: 'screenshot_region', onClicked: () => {
-                Utils.execAsync(`${App.configDir}/scripts/grimblast.sh`)
+                Utils.execAsync(`${App.configDir}/scripts/grimblast.sh copy area`)
                     .catch(print)
             }
         }),
@@ -78,14 +78,14 @@ const Utilities = () => Box({
         }),
         UtilButton({
             name: 'Toggle on-screen keyboard', icon: 'keyboard', onClicked: () => {
-                App.toggleWindow('osk');
+                toggleWindowOnAllMonitors('osk');
             }
         }),
     ]
 })
 
 const BarBattery = () => Box({
-    className: 'spacing-h-4 txt-onSurfaceVariant',
+    className: 'spacing-h-4 bar-batt-txt',
     children: [
         Revealer({
             transitionDuration: userOptions.animations.durationSmall,
@@ -97,7 +97,7 @@ const BarBattery = () => Box({
             }),
         }),
         Label({
-            className: 'txt-smallie txt-onSurfaceVariant',
+            className: 'txt-smallie',
             setup: (self) => self.hook(Battery, label => {
                 label.label = `${Battery.percent}%`;
             }),
@@ -108,7 +108,7 @@ const BarBattery = () => Box({
                 className: 'bar-batt',
                 homogeneous: true,
                 children: [
-                    MaterialIcon('settings_heart', 'small'),
+                    MaterialIcon('battery_full', 'small'),
                 ],
                 setup: (self) => self.hook(Battery, box => {
                     box.toggleClassName('bar-batt-low', Battery.percent <= userOptions.battery.low);
@@ -154,7 +154,7 @@ const BatteryModule = () => Stack({
                 ],
                 setup: (self) => self.poll(900000, async (self) => {
                     const WEATHER_CACHE_PATH = WEATHER_CACHE_FOLDER + '/wttr.in.txt';
-                    const updateWeatherForCity = (city) => execAsync(`curl https://wttr.in/${city}?format=j1`)
+                    const updateWeatherForCity = (city) => execAsync(`curl https://wttr.in/${city.replace(/ /g, '%20')}?format=j1`)
                         .then(output => {
                             const weather = JSON.parse(output);
                             Utils.writeFile(JSON.stringify(weather), WEATHER_CACHE_PATH)
@@ -185,7 +185,7 @@ const BatteryModule = () => Stack({
                             }
                         });
                     if (userOptions.weather.city != '' && userOptions.weather.city != null) {
-                        updateWeatherForCity(userOptions.weather.city);
+                        updateWeatherForCity(userOptions.weather.city.replace(/ /g, '%20'));
                     }
                     else {
                         Utils.execAsync('curl ipinfo.io')

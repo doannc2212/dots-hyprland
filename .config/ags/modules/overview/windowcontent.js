@@ -8,8 +8,10 @@ const { execAsync, exec } = Utils;
 import { execAndClose, expandTilde, hasUnterminatedBackslash, couldBeMath, launchCustomCommand, ls } from './miscfunctions.js';
 import {
     CalculationResultButton, CustomCommandButton, DirectoryButton,
-    DesktopEntryButton, ExecuteCommandButton, SearchButton
+    DesktopEntryButton, ExecuteCommandButton, SearchButton, AiButton
 } from './searchbuttons.js';
+import { checkKeybind } from '../.widgetutils/keybind.js';
+import GeminiService from '../../services/gemini.js';
 
 // Add math funcs
 const { abs, sin, cos, tan, cot, asin, acos, atan, acot } = Math;
@@ -49,16 +51,9 @@ const overviewContent = await OptionalOverview();
 export const SearchAndWindows = () => {
     var _appSearchResults = [];
 
-    const ClickToClose = ({ ...props }) => Widget.EventBox({
-        ...props,
-        onPrimaryClick: () => App.closeWindow('overview'),
-        onSecondaryClick: () => App.closeWindow('overview'),
-        onMiddleClick: () => App.closeWindow('overview'),
-    });
     const resultsBox = Widget.Box({
         className: 'overview-search-results',
         vertical: true,
-        vexpand: true,
     });
     const resultsRevealer = Widget.Revealer({
         transitionDuration: userOptions.animations.durationLarge,
@@ -139,8 +134,9 @@ export const SearchAndWindows = () => {
             }
 
             else {
+                GeminiService.send(text);
                 App.closeWindow('overview');
-                execAsync(['bash', '-c', `xdg-open '${userOptions.search.engineBaseUrl}${text} ${['', ...userOptions.search.excludedSites].join(' -site:')}' &`]).catch(print);
+                App.openWindow('sideleft');
             }
         },
         onChange: (entry) => { // this is when you type
@@ -199,6 +195,7 @@ export const SearchAndWindows = () => {
             }
 
             // Add fallback: search
+            resultsBox.add(AiButton({ text: entry.text }));
             resultsBox.add(SearchButton({ text: entry.text }));
             resultsBox.show_all();
         },
@@ -206,11 +203,6 @@ export const SearchAndWindows = () => {
     return Widget.Box({
         vertical: true,
         children: [
-            ClickToClose({ // Top margin. Also works as a click-outside-to-close thing
-                child: Widget.Box({
-                    className: 'bar-height',
-                })
-            }),
             Widget.Box({
                 hpack: 'center',
                 children: [
@@ -237,24 +229,18 @@ export const SearchAndWindows = () => {
             .on('key-press-event', (widget, event) => { // Typing
                 const keyval = event.get_keyval()[1];
                 const modstate = event.get_state()[1];
-                if (modstate & Gdk.ModifierType.CONTROL_MASK) { // Ctrl held
-                    if (keyval == Gdk.KEY_b) 
-                        entry.set_position(Math.max(entry.get_position() - 1, 0));
-                    else if (keyval == Gdk.KEY_f)
-                        entry.set_position(Math.min(entry.get_position() + 1, entry.get_text().length));
-                    else if (keyval == Gdk.KEY_n) { // simulate Down arrow
-                        entry.get_root_window().simulate_key_press(Gdk.KEY_Down, Gdk.ModifierType.NONE);
-                        // entry.get_root_window().simulate_key_release(Gdk.KEY_Down, Gdk.ModifierType.NONE);
-                    }
-                    else if (keyval == Gdk.KEY_k) { // Delete to end
-                        const text = entry.get_text();
-                        const pos = entry.get_position();
-                        const newText = text.slice(0, pos);
-                        entry.set_text(newText);
-                        entry.set_position(newText.length);
-                    }
+                if (checkKeybind(event, userOptions.keybinds.overview.altMoveLeft))
+                    entry.set_position(Math.max(entry.get_position() - 1, 0));
+                else if (checkKeybind(event, userOptions.keybinds.overview.altMoveRight))
+                    entry.set_position(Math.min(entry.get_position() + 1, entry.get_text().length));
+                else if (checkKeybind(event, userOptions.keybinds.overview.deleteToEnd)) {
+                    const text = entry.get_text();
+                    const pos = entry.get_position();
+                    const newText = text.slice(0, pos);
+                    entry.set_text(newText);
+                    entry.set_position(newText.length);
                 }
-                else { // Ctrl not held
+                else if (!(modstate & Gdk.ModifierType.CONTROL_MASK)) { // Ctrl not held
                     if (keyval >= 32 && keyval <= 126 && widget != entry) {
                         Utils.timeout(1, () => entry.grab_focus());
                         entry.set_text(entry.text + String.fromCharCode(keyval));
@@ -264,4 +250,4 @@ export const SearchAndWindows = () => {
             })
         ,
     });
-}; 
+};

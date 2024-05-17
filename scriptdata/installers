@@ -8,7 +8,7 @@
 # export base="$(pwd)"
 
 install-yay() {
-  x sudo pacman -Sy --needed --noconfirm base-devel
+  x sudo pacman -S --needed --noconfirm base-devel
   x git clone https://aur.archlinux.org/yay-bin.git /tmp/buildyay
   x cd /tmp/buildyay
   x makepkg -o
@@ -24,9 +24,9 @@ install-ags (){
   try git init -b main
   try git remote add origin https://github.com/Aylur/ags.git
   x git pull origin main && git submodule update --init --recursive
-  x git checkout 7ba2efd705ea255b87e4812b22bb656b60d291d4 # "add fallback generic Attribute type to widget functions"
+  x git checkout 05e0f23534fa30c1db2a142664ee8f71e38db260
   x npm install
-  x meson setup build
+  x meson setup build --reconfigure
   x meson install -C build
   x cd $base
 }
